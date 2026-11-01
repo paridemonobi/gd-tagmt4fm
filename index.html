@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Gaudio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gaudio">
+<meta name="theme-color" content="#050506">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+  @font-face { font-family: "JetBrains Mono"; font-weight: 500;
+               src: url("JetBrainsMonoNL-Medium.ttf") format("truetype"); }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+               background: #050506; color: #B2FAFF; overscroll-behavior: none;
+               -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+               -webkit-tap-highlight-color: transparent; touch-action: none; }
+  body { position: fixed; inset: 0; }
+  canvas { position: absolute; display: block; touch-action: none; outline: none; }
+  #canvas { background: #050506; }
+  #boot { position: absolute; inset: 0; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 18px;
+          font: 500 18px "JetBrains Mono", Menlo, monospace; letter-spacing: .12em;
+          background: #050506; z-index: 5; transition: opacity .4s; }
+  #boot .t { font-size: 34px; color: #59F4FF; letter-spacing: .3em; }
+  #boot .bar { width: 320px; height: 4px; background: #11181A; }
+  #boot .bar i { display: block; height: 100%; width: 0; background: #59F4FF; transition: width .2s; }
+  #boot .m { color: #649599; font-size: 14px; min-height: 18px; }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="-1"></canvas>
+<canvas id="mpk"></canvas>
+<div id="boot"><div class="t">GAUDIO</div><div class="bar"><i id="bootbar"></i></div><div class="m" id="bootmsg">CARICAMENTO</div></div>
+<div id="diag"></div>
+<script>
+  /* DIAGNOSTICA a schermo (iPad senza console): errori JS/wasm/WebGL, la fase
+   * dell'avvio e la memoria. Si apre da sola a un errore, o se il pannello
+   * non parte entro 25 s, o con ?diag=1; un tocco la chiude. La fase e la
+   * memoria si scrivono anche in localStorage: se Safari uccide la pagina
+   * (memoria) e la ricarica, al giro dopo si legge dove era arrivata. */
+  (function () {
+    var box = document.getElementById('diag'), lines = [], shown = false;
+    var st = box.style;
+    st.cssText = 'position:absolute;left:8px;top:8px;right:8px;max-height:60%;overflow:auto;z-index:20;' +
+      'display:none;background:rgba(5,5,6,.92);border:1px solid #59F4FF;color:#B2FAFF;padding:10px 12px;' +
+      'font:13px/1.35 Menlo,monospace;white-space:pre-wrap;word-break:break-all;-webkit-user-select:text;user-select:text';
+    function memMB() {
+      try { return Math.round(Module.HEAPF32.buffer.byteLength / 1048576); } catch (e) { return 0; }
+    }
+    var head = '', maxMB = 0;
+    function render() { box.textContent = (head ? head + '\n' : '') + lines.join('\n'); }
+    window.gaudioDiag = function (t, open) {
+      var s = ((performance.now() / 1000).toFixed(1)) + 's ' + t;
+      lines.push(s); if (lines.length > 60) lines.shift();
+      try { navigator.sendBeacon('/diag', s); } catch (e) {}
+      if (open && !shown) { shown = true; st.display = 'block'; }
+      render();
+    };
+    /* la riga di stato in cima: memoria wasm adesso / massima, JS, audio,
+     * salvataggi; aggiornata ogni 2 s (e scritta in localStorage) */
+    window.gaudioStatus = function (p) {
+      var mb = memMB(); if (mb > maxMB) maxMB = mb;
+      var js = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB' : 'n/d';
+      var a = window.gaudioAudioStats, au = a && a.frames ?
+        'audio ' + (100 * a.ms / (1000 * a.frames / a.fs)).toFixed(1) + '% (' + a.mode + ', coda ' + a.buf + ') SOTTOCARICHI ' + (a.under || 0) + ' pausa max ' + (a.gapMax || 0) + ' ms blocchi lenti ' + a.late : 'audio fermo';
+      head = 'MEMORIA wasm ' + mb + ' MB (max ' + maxMB + ') | JS ' + js + ' | ' + au +
+             ' | salvataggi ' + (Module.gaudioSyncs || 0) + ' | ' + p + ' | ' + Math.round(performance.now() / 1000) + ' s';
+      try { localStorage.setItem('gaudio-fase', head + ' | ' + new Date().toISOString()); } catch (e) {}
+      try { navigator.sendBeacon('/diag', 'STATO ' + head); } catch (e) {}
+      if (shown) render();
+    };
+    window.gaudioPhase = function (p) {
+      window.gaudioStatus(p);
+      window.gaudioDiag('fase: ' + p + ' (wasm ' + memMB() + ' MB)');
+    };
+    box.addEventListener('click', function () { st.display = 'none'; });
+    try {
+      var prev = localStorage.getItem('gaudio-fase');
+      if (prev) window.gaudioDiag('giro precedente: ' + prev);
+      var n = +(sessionStorage.getItem('gaudio-giri') || 0) + 1;
+      sessionStorage.setItem('gaudio-giri', n);
+      if (n > 1) window.gaudioDiag('caricata ' + n + ' volte in questa scheda (a mano, o Safari che chiude la pagina)', !/in funzione/.test(prev || ''));
+    } catch (e) {}
+    window.addEventListener('error', function (e) {
+      window.gaudioDiag('ERRORE JS: ' + (e.message || e) + (e.filename ? ' @' + e.filename.split('/').pop() + ':' + e.lineno : ''), true);
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      window.gaudioDiag('PROMESSA RIFIUTATA: ' + (e.reason && (e.reason.stack || e.reason.message) || e.reason), true);
+    });
+    /* WebGL2 com'e' su questo dispositivo, prima del firmware */
+    try {
+      var tc = document.createElement('canvas');
+      var gl = tc.getContext('webgl2', { stencil: true, antialias: false });
+      if (!gl) window.gaudioDiag('WebGL2 NON DISPONIBILE su questo browser', true);
+      else {
+        var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+        window.gaudioDiag('WebGL2 ok: ' + (dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) +
+          ' | stencil ' + gl.getParameter(gl.STENCIL_BITS) + ' | max tex ' + gl.getParameter(gl.MAX_TEXTURE_SIZE));
+        var lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
+      }
+    } catch (e) { window.gaudioDiag('WebGL2 errore: ' + e, true); }
+    window.gaudioDiag('schermo ' + innerWidth + 'x' + innerHeight + ' dpr ' + devicePixelRatio +
+      ' | ' + navigator.userAgent.replace(/^Mozilla\/5.0 /, ''));
+    if (/[?&]diag=1/.test(location.search)) { shown = true; st.display = 'block'; }
+    setTimeout(function () {
+      if (!window.gaudioPanelUp) window.gaudioDiag('il pannello non e\' partito dopo 25 s', true);
+    }, 25000);
+  })();
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    print: function (t) { console.log(t); if (/errore|error|fallit|non disponibile/i.test(t)) window.gaudioDiag(t); },
+    printErr: function (t) {
+      console.warn(t);
+      if (/errore|error|fallit|non disponibile|abort|webgl|gpu_output|audio\(web\)/i.test(t)) window.gaudioDiag(t);
+    },
+    setStatus: function (t) {
+      var m = /([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/.exec(t || '');
+      var bar = document.getElementById('bootbar'), msg = document.getElementById('bootmsg');
+      if (!bar) return;
+      if (m) { bar.style.width = (100 * parseInt(m[2]) / parseInt(m[4])) + '%'; msg.textContent = 'CARICAMENTO DEI SUONI'; }
+      else if (t) msg.textContent = t;
+    },
+    onAbort: function (w) {
+      var msg = document.getElementById('bootmsg');
+      if (msg) msg.textContent = 'ERRORE: ' + w;
+      window.gaudioDiag('ABORT wasm: ' + w, true);
+    }
+  };
+  /* memoria e fase ogni 2 s (localStorage: sopravvive a una pagina uccisa) */
+  setInterval(function () { window.gaudioStatus(window.gaudioPanelUp ? 'in funzione' : 'avvio'); }, 2000);
+  /* main gira (con ASYNCIFY il primo ciclo che dorme = calledRun): via la
+   * schermata di avvio */
+  function hideBoot() {
+    var b = document.getElementById('boot');
+    if (b) { b.style.opacity = '0'; setTimeout(function () { b.remove(); }, 450); }
+  }
+  window.gaudioBootDone = hideBoot;
+  if ('serviceWorker' in navigator && location.protocol === 'https:')
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+</script>
+<script src="mpk.js"></script>
+<script src="audio.js"></script>
+<script>
+  /* la schermata d'avvio va via al primo fotogramma del pannello
+   * (gpu_output_web.c); il contesto WebGL perso si vede in diagnostica */
+  window.gaudioPhase('pagina caricata');
+  /* contesto WebGL perso (Safari sotto pressione di memoria, o in secondo
+   * piano): preventDefault chiede al browser di ridarlo. NanoVG tiene
+   * texture e shader nel contesto vecchio e il pannello non sa ricrearli:
+   * quando torna, si salva (IndexedDB) e si ricarica la pagina, una volta. */
+  document.getElementById('canvas').addEventListener('webglcontextlost', function (e) {
+    e.preventDefault();
+    window.gaudioDiag('CONTESTO WebGL PERSO (memoria GPU?): aspetto che torni', true);
+  });
+  document.getElementById('canvas').addEventListener('webglcontextrestored', function () {
+    window.gaudioDiag('contesto WebGL tornato: salvo e ricarico', true);
+    try { if (Module.gaudioSync) Module.gaudioSync(); } catch (e) {}
+    setTimeout(function () { location.reload(); }, 1500);
+  });
+</script>
+<script async src="gaudio.js"></script>
+</body>
+</html>
