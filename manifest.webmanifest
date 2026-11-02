@@ -1,7 +1,7 @@
 {
-  "name": "Gaudio",
-  "short_name": "Gaudio",
-  "description": "Gaudio machinette: il firmware del groovebox nel browser",
+  "name": "RITUAL",
+  "short_name": "RITUAL",
+  "description": "RITUAL: il groovebox nel browser",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",
