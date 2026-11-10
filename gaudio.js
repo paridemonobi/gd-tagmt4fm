@@ -26,7 +26,7 @@ const ENVIRONMENT_IS_SHELL = false;
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /var/folders/fy/hxf8bl155p9987vh2htdcl5m0000gn/T/tmplnt0yazp.js
+// include: /var/folders/fy/hxf8bl155p9987vh2htdcl5m0000gn/T/tmph9bof841.js
 
   if (!Module['expectedDataFileDownloads']) Module['expectedDataFileDownloads'] = 0;
   Module['expectedDataFileDownloads']++;
@@ -167,7 +167,7 @@ Module['FS_createPath']("/pack", "wavetables", true, true);
 
   })();
 
-// end include: /var/folders/fy/hxf8bl155p9987vh2htdcl5m0000gn/T/tmplnt0yazp.js
+// end include: /var/folders/fy/hxf8bl155p9987vh2htdcl5m0000gn/T/tmph9bof841.js
 // include: src/platform/web/shell/pre.js
 /* Gaudio web — preparazione del firmware nel browser (--pre-js).
  *

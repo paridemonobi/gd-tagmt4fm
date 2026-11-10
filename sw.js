@@ -3,7 +3,7 @@
  * quando la pagina e' servita in https. La versione (impronta dei file,
  * scritta da tools/build_web.sh) cambia a ogni build: la cache vecchia si
  * butta. */
-var VER = 'gaudio-a486f9d15828';
+var VER = 'gaudio-c201375b8dcd';
 var FILES = ['./', 'index.html', 'mpk.js', 'audio.js', 'gaudio.js', 'gaudio.wasm', 'gaudio.data',
              'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png',
              'JetBrainsMonoNL-Medium.ttf'];
